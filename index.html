@@ -31,6 +31,8 @@ const errorBox=document.getElementById('error');
 const permission=document.getElementById('permission');
 const allow=document.getElementById('allow');
 let stream=null;
+let cameraStarting=null;
+let pageActive=true;
 
 function showError(message){
   errorBox.textContent=message;
@@ -39,33 +41,73 @@ function showError(message){
 }
 
 async function openCamera(){
-  try{
-    if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
-      throw new Error('Camera access requires an HTTPS website.');
+  // Prevent duplicate getUserMedia()/play() calls. Mobile browsers can
+  // cancel an earlier play() when a second load/start is triggered.
+  if (stream && video.srcObject === stream) {
+    if (video.paused) {
+      try { await video.play(); } catch (_) {}
     }
-    status.textContent='Allow camera access…';
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
-      audio:false
-    });
-    video.srcObject=stream;
-    await video.play();
-    status.textContent='Live camera view';
-    setTimeout(()=>status.style.display='none',1200);
-    permission.style.display='none';
-  }catch(e){
-    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
-      permission.style.display='flex';
-      status.style.display='none';
-    }else{
-      showError(e.message||'Unable to open the camera.');
-    }
+    return;
   }
+  if (cameraStarting) return cameraStarting;
+
+  cameraStarting=(async()=>{
+    try{
+      if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
+        throw new Error('Camera access requires an HTTPS website.');
+      }
+      status.textContent='Allow camera access…';
+      const newStream=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
+        audio:false
+      });
+
+      // If the page became inactive while permission was being requested,
+      // cleanly stop the newly created stream instead of starting playback.
+      if(!pageActive){
+        newStream.getTracks().forEach(t=>t.stop());
+        return;
+      }
+
+      stream=newStream;
+      video.srcObject=stream;
+      video.muted=true;
+      video.setAttribute('playsinline','');
+      video.setAttribute('autoplay','');
+
+      // One play request only, after srcObject is assigned.
+      try { await video.play(); } catch(e) {
+        if(e.name !== 'AbortError') throw e;
+      }
+
+      status.textContent='Live camera view';
+      setTimeout(()=>status.style.display='none',1200);
+      permission.style.display='none';
+    }catch(e){
+      if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+        permission.style.display='flex';
+        status.style.display='none';
+      }else if(e.name!=='AbortError'){
+        showError(e.message||'Unable to open the camera.');
+      }
+    }finally{
+      cameraStarting=null;
+    }
+  })();
+
+  return cameraStarting;
 }
 
 allow.addEventListener('click',openCamera);
-window.addEventListener('pagehide',()=>stream?.getTracks().forEach(t=>t.stop()));
-window.addEventListener('pageshow',()=>{if(!stream)openCamera();});
+window.addEventListener('pagehide',()=>{
+  pageActive=false;
+  stream?.getTracks().forEach(t=>t.stop());
+  stream=null;
+});
+window.addEventListener('pageshow',()=>{
+  pageActive=true;
+  if(!stream && !cameraStarting) openCamera();
+});
 openCamera();
 </script>
 </body>
