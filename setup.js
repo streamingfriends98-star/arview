@@ -1,0 +1,4 @@
+const field=document.getElementById('url'),notice=document.getElementById('notice');
+if(location.protocol==='https:')field.value=new URL('index.html',location.href).href;
+document.getElementById('generate').onclick=()=>{try{const u=new URL(field.value.trim());if(u.protocol!=='https:')throw Error('Use the published HTTPS address.');if(!window.QRCode)throw Error('QR library unavailable. Connect to the internet and reload.');document.getElementById('qr').replaceChildren();new QRCode(document.getElementById('qr'),{text:u.href,width:240,height:240,correctLevel:QRCode.CorrectLevel.M});document.getElementById('destination').textContent=u.href;notice.textContent='QR ready. Scan it with a compatible phone to launch Surface AR.';}catch(e){notice.textContent=e.message;}};
+document.getElementById('print').onclick=()=>{if(!document.querySelector('#qr canvas')){notice.textContent='Generate a QR code before printing.';return;}window.print();};

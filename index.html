@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Camera Preview</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:Arial,sans-serif}
+#app{position:fixed;inset:0;background:#000}
+#camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#preview{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(88vw,700px);height:auto;max-height:88vh;object-fit:contain;z-index:2;pointer-events:none}
+#status{position:fixed;left:50%;top:max(18px,env(safe-area-inset-top));transform:translateX(-50%);z-index:5;color:#fff;background:rgba(0,0,0,.58);padding:10px 15px;border-radius:999px;font-size:13px;text-align:center;white-space:nowrap;backdrop-filter:blur(8px)}
+#error{display:none;position:fixed;inset:0;z-index:10;align-items:center;justify-content:center;text-align:center;padding:28px;color:#fff;background:#000;font-size:15px;line-height:1.5}
+#permission{display:none;position:fixed;inset:0;z-index:9;align-items:center;justify-content:center;text-align:center;padding:28px;color:#fff;background:#000}
+#permission button{border:0;border-radius:12px;padding:13px 20px;font-weight:700;font-size:16px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <video id="camera" autoplay playsinline muted></video>
+  <img id="preview" src="assets/preview.webp" alt="Preview">
+</div>
+<div id="status">Opening camera…</div>
+<div id="permission"><div><p>Camera access is required to show the live camera view.</p><button id="allow">Allow Camera</button></div></div>
+<div id="error"></div>
+<script>
+const video=document.getElementById('camera');
+const status=document.getElementById('status');
+const errorBox=document.getElementById('error');
+const permission=document.getElementById('permission');
+const allow=document.getElementById('allow');
+let stream=null;
+
+function showError(message){
+  errorBox.textContent=message;
+  errorBox.style.display='flex';
+  status.style.display='none';
+}
+
+async function openCamera(){
+  try{
+    if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
+      throw new Error('Camera access requires an HTTPS website.');
+    }
+    status.textContent='Allow camera access…';
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},
+      audio:false
+    });
+    video.srcObject=stream;
+    await video.play();
+    status.textContent='Live camera view';
+    setTimeout(()=>status.style.display='none',1200);
+    permission.style.display='none';
+  }catch(e){
+    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+      permission.style.display='flex';
+      status.style.display='none';
+    }else{
+      showError(e.message||'Unable to open the camera.');
+    }
+  }
+}
+
+allow.addEventListener('click',openCamera);
+window.addEventListener('pagehide',()=>stream?.getTracks().forEach(t=>t.stop()));
+window.addEventListener('pageshow',()=>{if(!stream)openCamera();});
+openCamera();
+</script>
+</body>
+</html>
