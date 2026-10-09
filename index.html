@@ -25,6 +25,9 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font-f
 <div id="permission"><div><p>Camera access is required to show the live camera view.</p><button id="allow">Allow Camera</button></div></div>
 <div id="error"></div>
 <script>
+// Count this page visit; tracking failure must never interrupt the camera preview.
+fetch('track.php', {method:'GET', cache:'no-store', keepalive:true}).catch(()=>{});
+
 const video=document.getElementById('camera');
 const status=document.getElementById('status');
 const errorBox=document.getElementById('error');
